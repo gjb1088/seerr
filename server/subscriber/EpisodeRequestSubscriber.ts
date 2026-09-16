@@ -1,7 +1,6 @@
 import { MediaRequestStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import EpisodeRequest from '@server/entity/EpisodeRequest';
-import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { Notification } from '@server/lib/notifications';
 import logger from '@server/logger';
@@ -53,24 +52,17 @@ export class EpisodeRequestSubscriber
     if (
       entity.type !== MediaType.TV ||
       !entity.episodes?.length ||
-      entity.status !== MediaRequestStatus.COMPLETED
+      entity.status !== MediaRequestStatus.COMPLETED ||
+      !entity.media
     ) {
       return;
     }
 
-    const media =
-      entity.media ??
-      (await getRepository(Media).findOne({
-        where: { id: entity.media?.id },
-      }));
-
-    if (media) {
-      await MediaRequest.sendNotification(
-        entity,
-        media,
-        Notification.MEDIA_AVAILABLE
-      );
-    }
+    await MediaRequest.sendNotification(
+      entity,
+      entity.media,
+      Notification.MEDIA_AVAILABLE
+    );
   }
 
   public async afterInsert(event: InsertEvent<MediaRequest>): Promise<void> {
@@ -94,13 +86,15 @@ export class EpisodeRequestSubscriber
       return;
     }
 
+    const entity = event.entity as MediaRequest;
+
     try {
-      await this.syncStatus(event.entity);
-      await this.notifyCompleted(event.entity);
+      await this.syncStatus(entity);
+      await this.notifyCompleted(entity);
     } catch (e) {
       logger.error('Failed to synchronize episode request after update', {
         label: 'Episode Request',
-        requestId: event.entity.id,
+        requestId: entity.id,
         errorMessage: e instanceof Error ? e.message : String(e),
       });
     }
