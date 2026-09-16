@@ -3,6 +3,7 @@ export interface SonarrReleaseResource {
   title: string;
   indexerId: number;
   indexer?: string;
+  quality?: unknown;
   qualityWeight: number;
   customFormatScore: number;
   protocol: string;
@@ -45,6 +46,9 @@ const episodeShape = (release: SonarrReleaseResource): string =>
     ].sort((a, b) => a - b),
   });
 
+const qualityShape = (release: SonarrReleaseResource): string =>
+  JSON.stringify(release.quality ?? null);
+
 const isUsable = (release: SonarrReleaseResource): boolean =>
   release.approved &&
   !release.temporarilyRejected &&
@@ -53,9 +57,9 @@ const isUsable = (release: SonarrReleaseResource): boolean =>
 
 /**
  * Sonarr returns interactive-search results in its preferred order. Keep the
- * first approved result's quality, custom-format score, protocol, and episode
- * shape, then deliberately move torrent seed count ahead of Sonarr's later
- * tie-breakers (such as indexer priority and size).
+ * first approved result's exact quality, quality weight, custom-format score,
+ * protocol, and episode shape, then deliberately move torrent seed count
+ * ahead of Sonarr's later tie-breakers (such as indexer priority and size).
  *
  * A torrent must report at least one seeder before we force-grab it. If the
  * best preferred group has no healthy torrent, leave the episode monitored so
@@ -78,10 +82,12 @@ export const selectSeededEpisodeRelease = (
     };
   }
 
+  const preferredQuality = qualityShape(preferred);
   const preferredShape = episodeShape(preferred);
   const preferredGroup = usable.filter(
     (release) =>
       release.protocol.toLowerCase() === 'torrent' &&
+      qualityShape(release) === preferredQuality &&
       release.qualityWeight === preferred.qualityWeight &&
       release.customFormatScore === preferred.customFormatScore &&
       episodeShape(release) === preferredShape
