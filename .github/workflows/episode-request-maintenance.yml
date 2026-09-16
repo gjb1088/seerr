@@ -1,0 +1,74 @@
+name: Episode Request Maintenance
+
+on:
+  push:
+    branches:
+      - feature/episode-requests-v3.4.1
+
+permissions:
+  contents: write
+
+jobs:
+  format-and-i18n:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/episode-requests-v3.4.1
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format feature files
+        run: |
+          pnpm exec prettier --write \
+            server/api/servarr/sonarr.ts \
+            server/entity/EpisodeRequest.ts \
+            server/entity/MediaRequest.ts \
+            server/interfaces/api/requestInterfaces.ts \
+            server/lib/episodeRequestResolver.ts \
+            server/lib/scanners/sonarr/index.ts \
+            server/migration/postgres/1789579800000-AddEpisodeRequests.ts \
+            server/migration/sqlite/1789579800000-AddEpisodeRequests.ts \
+            server/subscriber/EpisodeRequestSubscriber.ts \
+            src/components/RequestModal/EpisodeRequestSelector.tsx \
+            src/components/RequestModal/TvEpisodeRequestModal.tsx \
+            src/components/RequestModal/TvRequestModal.tsx
+
+      - name: Extract i18n messages
+        run: pnpm i18n:extract
+
+      - name: Commit generated changes
+        run: |
+          if git diff --quiet; then
+            echo "No generated changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            server/api/servarr/sonarr.ts \
+            server/entity/EpisodeRequest.ts \
+            server/entity/MediaRequest.ts \
+            server/interfaces/api/requestInterfaces.ts \
+            server/lib/episodeRequestResolver.ts \
+            server/lib/scanners/sonarr/index.ts \
+            server/migration/postgres/1789579800000-AddEpisodeRequests.ts \
+            server/migration/sqlite/1789579800000-AddEpisodeRequests.ts \
+            server/subscriber/EpisodeRequestSubscriber.ts \
+            src/components/RequestModal/EpisodeRequestSelector.tsx \
+            src/components/RequestModal/TvEpisodeRequestModal.tsx \
+            src/components/RequestModal/TvRequestModal.tsx \
+            src/i18n/locale/en.json
+          git commit -m "chore: format episode request feature and extract i18n"
+          git push origin HEAD:feature/episode-requests-v3.4.1
