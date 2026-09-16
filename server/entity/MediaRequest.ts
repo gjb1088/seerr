@@ -28,6 +28,7 @@ import {
   RelationCount,
   UpdateDateColumn,
 } from 'typeorm';
+import EpisodeRequest from './EpisodeRequest';
 import Media from './Media';
 import SeasonRequest from './SeasonRequest';
 import { User } from './User';
@@ -36,6 +37,7 @@ export class RequestPermissionError extends Error {}
 export class QuotaRestrictedError extends Error {}
 export class DuplicateMediaRequestError extends Error {}
 export class NoSeasonsAvailableError extends Error {}
+export class NoEpisodesAvailableError extends Error {}
 export class BlocklistedMediaError extends Error {}
 
 type MediaRequestOptions = {
@@ -192,6 +194,8 @@ export class MediaRequest {
       .createQueryBuilder('request')
       .leftJoinAndSelect('request.media', 'media')
       .leftJoinAndSelect('request.requestedBy', 'user')
+      .leftJoinAndSelect('request.seasons', 'seasons')
+      .leftJoinAndSelect('request.episodes', 'episodes')
       .where('request.is4k = :is4k', { is4k: requestBody.is4k })
       .andWhere('media.tmdbId = :tmdbId', { tmdbId: tmdbMedia.id })
       .andWhere('media.mediaType = :mediaType', {
@@ -319,7 +323,7 @@ export class MediaRequest {
             }
 
             return keywordList
-              .map((keyword: TmdbKeyword) => keyword.id)
+              .map((keyword) => keyword.id)
               .includes(Number(keywordId));
           })
         ) {
@@ -411,6 +415,123 @@ export class MediaRequest {
       await requestRepository.save(request);
       return request;
     } else {
+      const isAutoApproved = user.hasPermission(
+        [
+          requestBody.is4k
+            ? Permission.AUTO_APPROVE_4K
+            : Permission.AUTO_APPROVE,
+          requestBody.is4k
+            ? Permission.AUTO_APPROVE_4K_TV
+            : Permission.AUTO_APPROVE_TV,
+          Permission.MANAGE_REQUESTS,
+        ],
+        { type: 'or' }
+      );
+
+      if (requestBody.episodes && requestBody.episodes.length > 0) {
+        const requestedEpisodes = Array.from(
+          new Map(
+            requestBody.episodes
+              .filter(
+                (episode) =>
+                  Number.isInteger(episode.seasonNumber) &&
+                  Number.isInteger(episode.episodeNumber) &&
+                  episode.seasonNumber >= 0 &&
+                  episode.episodeNumber > 0 &&
+                  (settings.main.enableSpecialEpisodes ||
+                    episode.seasonNumber > 0)
+              )
+              .map((episode) => [
+                `${episode.seasonNumber}:${episode.episodeNumber}`,
+                episode,
+              ])
+          ).values()
+        );
+
+        const activeRequests = existing.filter(
+          (request) =>
+            request.is4k === requestBody.is4k &&
+            request.status !== MediaRequestStatus.DECLINED &&
+            request.status !== MediaRequestStatus.COMPLETED
+        );
+        const requestedWholeSeasons = new Set(
+          activeRequests.flatMap((request) =>
+            (request.seasons ?? []).map((season) => season.seasonNumber)
+          )
+        );
+        const existingEpisodeKeys = new Set(
+          activeRequests.flatMap((request) =>
+            (request.episodes ?? []).map(
+              (episode) => `${episode.seasonNumber}:${episode.episodeNumber}`
+            )
+          )
+        );
+        const availableSeasons = new Set(
+          (media.seasons ?? [])
+            .filter(
+              (season) =>
+                season[requestBody.is4k ? 'status4k' : 'status'] ===
+                MediaStatus.AVAILABLE
+            )
+            .map((season) => season.seasonNumber)
+        );
+
+        const finalEpisodes = requestedEpisodes.filter(
+          (episode) =>
+            !requestedWholeSeasons.has(episode.seasonNumber) &&
+            !existingEpisodeKeys.has(
+              `${episode.seasonNumber}:${episode.episodeNumber}`
+            ) &&
+            !availableSeasons.has(episode.seasonNumber)
+        );
+
+        if (finalEpisodes.length === 0) {
+          throw new NoEpisodesAvailableError(
+            'No episodes available to request'
+          );
+        } else if (
+          !ignoreQuota &&
+          quotas.tv.limit &&
+          finalEpisodes.length > (quotas.tv.remaining ?? 0)
+        ) {
+          throw new QuotaRestrictedError('Series Quota exceeded.');
+        }
+
+        await mediaRepository.save(media);
+
+        const request = new MediaRequest({
+          type: MediaType.TV,
+          media,
+          requestedBy: requestUser,
+          status: isAutoApproved
+            ? MediaRequestStatus.APPROVED
+            : MediaRequestStatus.PENDING,
+          modifiedBy: isAutoApproved ? user : undefined,
+          is4k: requestBody.is4k,
+          serverId: requestBody.serverId,
+          profileId,
+          rootFolder,
+          languageProfileId: requestBody.languageProfileId,
+          tags,
+          seasons: [],
+          episodes: finalEpisodes.map(
+            (episode) =>
+              new EpisodeRequest({
+                seasonNumber: episode.seasonNumber,
+                episodeNumber: episode.episodeNumber,
+                status: isAutoApproved
+                  ? MediaRequestStatus.APPROVED
+                  : MediaRequestStatus.PENDING,
+              })
+          ),
+          isAutoRequest: options.isAutoRequest ?? false,
+          ignoreQuota,
+        });
+
+        await requestRepository.save(request);
+        return request;
+      }
+
       const tmdbMediaShow = tmdbMedia as Awaited<
         ReturnType<typeof tmdb.getTvShow>
       >;
@@ -483,34 +604,10 @@ export class MediaRequest {
         media,
         requestedBy: requestUser,
         // If the user is an admin or has the "auto approve" permission, automatically approve the request
-        status: user.hasPermission(
-          [
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K
-              : Permission.AUTO_APPROVE,
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K_TV
-              : Permission.AUTO_APPROVE_TV,
-            Permission.MANAGE_REQUESTS,
-          ],
-          { type: 'or' }
-        )
+        status: isAutoApproved
           ? MediaRequestStatus.APPROVED
           : MediaRequestStatus.PENDING,
-        modifiedBy: user.hasPermission(
-          [
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K
-              : Permission.AUTO_APPROVE,
-            requestBody.is4k
-              ? Permission.AUTO_APPROVE_4K_TV
-              : Permission.AUTO_APPROVE_TV,
-            Permission.MANAGE_REQUESTS,
-          ],
-          { type: 'or' }
-        )
-          ? user
-          : undefined,
+        modifiedBy: isAutoApproved ? user : undefined,
         is4k: requestBody.is4k,
         serverId: requestBody.serverId,
         profileId: profileId,
@@ -521,22 +618,12 @@ export class MediaRequest {
           (sn) =>
             new SeasonRequest({
               seasonNumber: sn,
-              status: user.hasPermission(
-                [
-                  requestBody.is4k
-                    ? Permission.AUTO_APPROVE_4K
-                    : Permission.AUTO_APPROVE,
-                  requestBody.is4k
-                    ? Permission.AUTO_APPROVE_4K_TV
-                    : Permission.AUTO_APPROVE_TV,
-                  Permission.MANAGE_REQUESTS,
-                ],
-                { type: 'or' }
-              )
+              status: isAutoApproved
                 ? MediaRequestStatus.APPROVED
                 : MediaRequestStatus.PENDING,
             })
         ),
+        episodes: [],
         isAutoRequest: options.isAutoRequest ?? false,
         ignoreQuota,
       });
@@ -595,6 +682,15 @@ export class MediaRequest {
     cascade: true,
   })
   public seasons: SeasonRequest[];
+
+  @RelationCount((request: MediaRequest) => request.episodes)
+  public episodeCount: number;
+
+  @OneToMany(() => EpisodeRequest, (episode) => episode.request, {
+    eager: true,
+    cascade: true,
+  })
+  public episodes: EpisodeRequest[];
 
   @Column({ default: false })
   public is4k: boolean;
@@ -753,9 +849,17 @@ export class MediaRequest {
   }
 
   @AfterLoad()
-  private sortSeasons() {
+  private sortChildren() {
     if (Array.isArray(this.seasons)) {
       this.seasons.sort((a, b) => a.id - b.id);
+    }
+    if (Array.isArray(this.episodes)) {
+      this.episodes.sort(
+        (a, b) =>
+          a.seasonNumber - b.seasonNumber ||
+          a.episodeNumber - b.episodeNumber ||
+          a.id - b.id
+      );
     }
   }
 
@@ -842,14 +946,29 @@ export class MediaRequest {
             omission: '…',
           }),
           image: `https://image.tmdb.org/t/p/w600_and_h900_bestv2${tv.poster_path}`,
-          extra: [
-            {
-              name: 'Requested Seasons',
-              value: entity.seasons
-                .map((season) => season.seasonNumber)
-                .join(', '),
-            },
-          ],
+          extra:
+            entity.episodes?.length > 0
+              ? [
+                  {
+                    name: 'Requested Episodes',
+                    value: entity.episodes
+                      .map(
+                        (episode) =>
+                          `S${String(episode.seasonNumber).padStart(2, '0')}E${String(
+                            episode.episodeNumber
+                          ).padStart(2, '0')}`
+                      )
+                      .join(', '),
+                  },
+                ]
+              : [
+                  {
+                    name: 'Requested Seasons',
+                    value: entity.seasons
+                      .map((season) => season.seasonNumber)
+                      .join(', '),
+                  },
+                ],
         });
       }
     } catch (e) {

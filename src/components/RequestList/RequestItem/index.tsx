@@ -33,6 +33,7 @@ import useSWR, { mutate } from 'swr';
 
 const messages = defineMessages('components.RequestList.RequestItem', {
   seasons: '{seasonCount, plural, one {Season} other {Seasons}}',
+  episodes: '{episodeCount, plural, one {Episode} other {Episodes}}',
   failedretry: 'Something went wrong while retrying the request.',
   failedmodify: 'Something went wrong while modifying the request.',
   requested: 'Requested',
@@ -508,6 +509,27 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                   </div>
                 </div>
               )}
+              {!isMovie(title) && request.episodes?.length > 0 && (
+                <div className="card-field">
+                  <span className="card-field-name">
+                    {intl.formatMessage(messages.episodes, {
+                      episodeCount: request.episodes.length,
+                    })}
+                  </span>
+                  <div className="hide-scrollbar flex flex-nowrap overflow-x-scroll">
+                    {request.episodes.map((episode) => (
+                      <span key={`episode-${episode.id}`} className="mr-2">
+                        <Badge>
+                          {`S${String(episode.seasonNumber).padStart(
+                            2,
+                            '0'
+                          )}E${String(episode.episodeNumber).padStart(2, '0')}`}
+                        </Badge>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="z-10 ml-4 mt-4 flex w-full flex-col justify-center gap-1 overflow-hidden pr-4 text-sm sm:ml-2 sm:mt-0 xl:flex-1 xl:pr-0">
@@ -758,6 +780,7 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
               </div>
             )}
           {requestData.status === MediaRequestStatus.PENDING &&
+            !requestData.episodes?.length &&
             (hasPermission(Permission.MANAGE_REQUESTS) ||
               (requestData.requestedBy.id === user?.id &&
                 (requestData.type === 'tv' ||

@@ -11,6 +11,7 @@ import {
   BlocklistedMediaError,
   DuplicateMediaRequestError,
   MediaRequest,
+  NoEpisodesAvailableError,
   NoSeasonsAvailableError,
   QuotaRestrictedError,
   RequestPermissionError,
@@ -126,6 +127,7 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         .createQueryBuilder('request')
         .leftJoinAndSelect('request.media', 'media')
         .leftJoinAndSelect('request.seasons', 'seasons')
+        .leftJoinAndSelect('request.episodes', 'episodes')
         .leftJoinAndSelect('request.modifiedBy', 'modifiedBy')
         .leftJoinAndSelect('request.requestedBy', 'requestedBy')
         .where('request.status IN (:...requestStatus)', {
@@ -325,6 +327,7 @@ requestRoutes.post<never, MediaRequest, MediaRequestBody>(
         case DuplicateMediaRequestError:
           return next({ status: 409, message: error.message });
         case NoSeasonsAvailableError:
+        case NoEpisodesAvailableError:
           return next({ status: 202, message: error.message });
         case BlocklistedMediaError:
           return next({ status: 403, message: error.message });
@@ -431,7 +434,12 @@ requestRoutes.get('/:requestId', async (req, res, next) => {
   try {
     const request = await requestRepository.findOneOrFail({
       where: { id: Number(req.params.requestId) },
-      relations: { requestedBy: true, modifiedBy: true },
+      relations: {
+        requestedBy: true,
+        modifiedBy: true,
+        seasons: true,
+        episodes: true,
+      },
     });
 
     if (
@@ -521,6 +529,14 @@ requestRoutes.put<{ requestId: string }>(
         request.languageProfileId = req.body.languageProfileId;
         request.tags = req.body.tags;
         request.requestedBy = requestUser as User;
+
+        if (request.episodes?.length) {
+          return next({
+            status: 400,
+            message:
+              'Individual episode requests cannot be edited. Delete the request and create a new one instead.',
+          });
+        }
 
         const requestedSeasons = req.body.seasons as number[] | undefined;
 
