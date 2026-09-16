@@ -12,6 +12,10 @@ const release = (
   title: 'Episode Release',
   indexerId: 1,
   indexer: 'Test Indexer',
+  quality: {
+    quality: { id: 6, name: 'WEBDL-1080p' },
+    revision: { version: 1, real: 0, isRepack: false },
+  },
   qualityWeight: 1200,
   customFormatScore: 100,
   protocol: 'torrent',
@@ -43,10 +47,29 @@ describe('selectSeededEpisodeRelease', () => {
     }
   });
 
-  it('does not trade preferred quality for a larger swarm', () => {
+  it('does not trade preferred quality weight for a larger swarm', () => {
     const result = selectSeededEpisodeRelease([
       release({ guid: 'preferred', seeders: 5, qualityWeight: 1200 }),
       release({ guid: 'lower-quality', seeders: 500, qualityWeight: 1100 }),
+    ]);
+
+    assert.equal(result.action, 'grab');
+    if (result.action === 'grab') {
+      assert.equal(result.release.guid, 'preferred');
+    }
+  });
+
+  it('does not trade exact quality for seeds when weights happen to match', () => {
+    const result = selectSeededEpisodeRelease([
+      release({ guid: 'preferred', seeders: 5 }),
+      release({
+        guid: 'different-quality',
+        seeders: 500,
+        quality: {
+          quality: { id: 4, name: 'HDTV-1080p' },
+          revision: { version: 1, real: 0, isRepack: false },
+        },
+      }),
     ]);
 
     assert.equal(result.action, 'grab');
