@@ -32,14 +32,18 @@ export class EpisodeRequestSubscriber
       return;
     }
 
-    const episodeRepository = getRepository(EpisodeRequest);
     const childStatus = entity.status;
-
-    for (const episode of entity.episodes) {
-      if (episode.status !== childStatus) {
-        episode.status = childStatus;
-        await episodeRepository.save(episode);
+    const changedEpisodes = entity.episodes.filter((episode) => {
+      if (episode.status === childStatus) {
+        return false;
       }
+
+      episode.status = childStatus;
+      return true;
+    });
+
+    if (changedEpisodes.length > 0) {
+      await getRepository(EpisodeRequest).save(changedEpisodes);
     }
   }
 
