@@ -1,0 +1,44 @@
+name: Episode Request Validation
+
+on:
+  push:
+    branches:
+      - feature/episode-requests-v3.4.1
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    container: node:22.22.2-alpine3.23
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+
+      - name: Install dependencies
+        env:
+          CI: true
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Formatting
+        run: pnpm format:check
+
+      - name: Build
+        run: pnpm build
+
+      - name: Unit tests
+        env:
+          CI: true
+        run: pnpm test
+
+      - name: i18n check
+        run: node bin/check-i18n.js
