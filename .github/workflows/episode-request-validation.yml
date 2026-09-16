@@ -19,12 +19,15 @@ jobs:
           persist-credentials: false
 
       - name: Install pnpm
-        run: corepack enable && corepack prepare pnpm@latest --activate
+        run: corepack enable && corepack prepare pnpm@10.24.0 --activate
 
       - name: Install dependencies
         env:
           CI: true
         run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
 
       - name: Lint
         run: pnpm lint
