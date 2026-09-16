@@ -1,3 +1,5 @@
+import { getApprovedEpisodeSelections } from '@server/lib/episodeRequestResolver';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AxiosResponse } from 'axios';
 import ServarrBase from './base';
@@ -125,8 +127,17 @@ class SonarrAPI extends ServarrBase<{
   episodeId: number;
   episode: EpisodeResult;
 }> {
+  private readonly is4k: boolean;
+
   constructor({ url, apiKey }: { url: string; apiKey: string }) {
     super({ url, apiKey, apiName: 'Sonarr', cacheName: 'sonarr' });
+
+    const matchingServer = getSettings().sonarr.find(
+      (server) =>
+        server.apiKey === apiKey &&
+        SonarrAPI.buildUrl(server, '/api/v3') === url
+    );
+    this.is4k = matchingServer?.is4k ?? false;
   }
 
   public async getSeries(): Promise<SonarrSeries[]> {
@@ -202,6 +213,25 @@ class SonarrAPI extends ServarrBase<{
   }
 
   public async addSeries(options: AddSeriesOptions): Promise<SonarrSeries> {
+    if (options.seasons.length === 0) {
+      const approvedEpisodes = await getApprovedEpisodeSelections({
+        tvdbId: options.tvdbid,
+        is4k: this.is4k,
+      });
+
+      if (approvedEpisodes.length === 0) {
+        throw new Error(
+          'Refusing empty-season Sonarr request because no approved episode selections were found.'
+        );
+      }
+
+      const result = await this.addSeriesForEpisodes(
+        options,
+        approvedEpisodes
+      );
+      return result.series;
+    }
+
     try {
       const series = await this.getSeriesByTvdbId(options.tvdbid);
 
@@ -569,6 +599,7 @@ class SonarrAPI extends ServarrBase<{
 
     return newSeasons;
   }
+
   public removeSeries = async (tvdbId: number): Promise<void> => {
     const { id, title } = await this.getSeriesByTvdbId(tvdbId);
 
