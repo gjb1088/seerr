@@ -14,7 +14,8 @@ export interface SonarrSeason {
     percentOfEpisodes: number;
   };
 }
-interface EpisodeResult {
+
+export interface EpisodeResult {
   seriesId: number;
   episodeFileId: number;
   seasonNumber: number;
@@ -28,6 +29,16 @@ interface EpisodeResult {
   absoluteEpisodeNumber: number;
   unverifiedSceneNumbering: boolean;
   id: number;
+}
+
+export interface EpisodeSelection {
+  seasonNumber: number;
+  episodeNumber: number;
+}
+
+export interface EpisodeSeriesResult {
+  series: SonarrSeries;
+  episodes: EpisodeResult[];
 }
 
 export interface SonarrSeries {
@@ -314,6 +325,109 @@ class SonarrAPI extends ServarrBase<{
     }
   }
 
+  public async addSeriesForEpisodes(
+    options: AddSeriesOptions,
+    requestedEpisodes: EpisodeSelection[]
+  ): Promise<EpisodeSeriesResult> {
+    try {
+      const lookupSeries = await this.getSeriesByTvdbId(options.tvdbid);
+      let sonarrSeries: SonarrSeries;
+
+      if (lookupSeries.id) {
+        lookupSeries.monitored = options.monitored ?? lookupSeries.monitored;
+        lookupSeries.tags = options.tags
+          ? Array.from(new Set([...lookupSeries.tags, ...options.tags]))
+          : lookupSeries.tags;
+
+        const updated = await this.axios.put<SonarrSeries>(
+          '/series',
+          lookupSeries
+        );
+        sonarrSeries = updated.data;
+      } else {
+        const created = await this.axios.post<SonarrSeries>('/series', {
+          tvdbId: options.tvdbid,
+          title: options.title,
+          qualityProfileId: options.profileId,
+          languageProfileId: options.languageProfileId,
+          seasons: lookupSeries.seasons.map((season) => ({
+            seasonNumber: season.seasonNumber,
+            monitored: false,
+          })),
+          tags: options.tags,
+          seasonFolder: options.seasonFolder,
+          monitored: options.monitored ?? true,
+          monitorNewItems: 'none',
+          rootFolderPath: options.rootFolderPath,
+          seriesType: options.seriesType,
+          addOptions: {
+            ignoreEpisodesWithFiles: true,
+            searchForMissingEpisodes: false,
+          },
+        } as Partial<SonarrSeries>);
+        sonarrSeries = created.data;
+      }
+
+      if (!sonarrSeries.id) {
+        throw new Error('Sonarr did not return a series ID');
+      }
+
+      const episodes = await this.getEpisodesWithRetry(sonarrSeries.id);
+      const selectedEpisodes = requestedEpisodes
+        .map((requested) =>
+          episodes.find(
+            (episode) =>
+              episode.seasonNumber === requested.seasonNumber &&
+              episode.episodeNumber === requested.episodeNumber
+          )
+        )
+        .filter((episode): episode is EpisodeResult => !!episode);
+
+      if (selectedEpisodes.length !== requestedEpisodes.length) {
+        const found = new Set(
+          selectedEpisodes.map(
+            (episode) => `${episode.seasonNumber}:${episode.episodeNumber}`
+          )
+        );
+        const missing = requestedEpisodes
+          .filter(
+            (episode) =>
+              !found.has(`${episode.seasonNumber}:${episode.episodeNumber}`)
+          )
+          .map(
+            (episode) => `S${episode.seasonNumber}E${episode.episodeNumber}`
+          );
+        throw new Error(`Sonarr could not resolve episodes: ${missing.join(', ')}`);
+      }
+
+      await this.monitorEpisodes(selectedEpisodes.map((episode) => episode.id));
+
+      const missingEpisodeIds = selectedEpisodes
+        .filter((episode) => !episode.hasFile)
+        .map((episode) => episode.id);
+      if (options.searchNow && missingEpisodeIds.length > 0) {
+        await this.searchEpisodes(missingEpisodeIds);
+      }
+
+      logger.info('Sonarr accepted episode request', {
+        label: 'Sonarr',
+        seriesId: sonarrSeries.id,
+        episodeCount: selectedEpisodes.length,
+      });
+
+      return { series: sonarrSeries, episodes: selectedEpisodes };
+    } catch (e) {
+      logger.error('Something went wrong while adding episodes to Sonarr.', {
+        label: 'Sonarr API',
+        errorMessage: e.message,
+        options,
+        requestedEpisodes,
+        response: e?.response?.data,
+      });
+      throw new Error('Failed to add requested episodes', { cause: e });
+    }
+  }
+
   public async getLanguageProfiles(): Promise<LanguageProfile[]> {
     try {
       const data = await this.getRolling<LanguageProfile[]>(
@@ -356,6 +470,28 @@ class SonarrAPI extends ServarrBase<{
     }
   }
 
+  public async searchEpisodes(episodeIds: number[]): Promise<void> {
+    if (episodeIds.length === 0) {
+      return;
+    }
+
+    logger.info('Executing episode search command.', {
+      label: 'Sonarr API',
+      episodeCount: episodeIds.length,
+    });
+
+    try {
+      await this.runCommand('EpisodeSearch', { episodeIds });
+    } catch (e) {
+      logger.error('Something went wrong while executing Sonarr episode search.', {
+        label: 'Sonarr API',
+        errorMessage: e.message,
+        episodeIds,
+      });
+      throw e;
+    }
+  }
+
   public async getEpisodes(seriesId: number): Promise<EpisodeResult[]> {
     try {
       const response = await this.axios.get<EpisodeResult[]>('/episode', {
@@ -372,7 +508,28 @@ class SonarrAPI extends ServarrBase<{
     }
   }
 
+  private async getEpisodesWithRetry(
+    seriesId: number,
+    attempts = 10
+  ): Promise<EpisodeResult[]> {
+    let episodes: EpisodeResult[] = [];
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      episodes = await this.getEpisodes(seriesId);
+      if (episodes.length > 0) {
+        return episodes;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    return episodes;
+  }
+
   public async monitorEpisodes(episodeIds: number[]): Promise<void> {
+    if (episodeIds.length === 0) {
+      return;
+    }
+
     try {
       await this.axios.put('/episode/monitor', {
         episodeIds,
