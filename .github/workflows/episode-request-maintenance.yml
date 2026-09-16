@@ -29,18 +29,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Apply episode request integration changes
+        run: node scripts/episode-request-codemod.mjs
+
       - name: Format feature files
         run: |
           pnpm exec prettier --write \
             server/api/servarr/sonarr.ts \
             server/entity/EpisodeRequest.ts \
             server/entity/MediaRequest.ts \
+            server/entity/User.ts \
             server/interfaces/api/requestInterfaces.ts \
             server/lib/episodeRequestResolver.ts \
             server/lib/scanners/sonarr/index.ts \
             server/migration/postgres/1789579800000-AddEpisodeRequests.ts \
             server/migration/sqlite/1789579800000-AddEpisodeRequests.ts \
+            server/routes/request.ts \
             server/subscriber/EpisodeRequestSubscriber.ts \
+            server/subscriber/MediaRequestSubscriber.ts \
+            src/components/RequestList/RequestItem/index.tsx \
             src/components/RequestModal/EpisodeRequestSelector.tsx \
             src/components/RequestModal/TvEpisodeRequestModal.tsx \
             src/components/RequestModal/TvRequestModal.tsx
@@ -60,15 +67,19 @@ jobs:
             server/api/servarr/sonarr.ts \
             server/entity/EpisodeRequest.ts \
             server/entity/MediaRequest.ts \
+            server/entity/User.ts \
             server/interfaces/api/requestInterfaces.ts \
             server/lib/episodeRequestResolver.ts \
             server/lib/scanners/sonarr/index.ts \
             server/migration/postgres/1789579800000-AddEpisodeRequests.ts \
             server/migration/sqlite/1789579800000-AddEpisodeRequests.ts \
+            server/routes/request.ts \
             server/subscriber/EpisodeRequestSubscriber.ts \
+            server/subscriber/MediaRequestSubscriber.ts \
+            src/components/RequestList/RequestItem/index.tsx \
             src/components/RequestModal/EpisodeRequestSelector.tsx \
             src/components/RequestModal/TvEpisodeRequestModal.tsx \
             src/components/RequestModal/TvRequestModal.tsx \
             src/i18n/locale/en.json
-          git commit -m "chore: format episode request feature and extract i18n"
+          git commit -m "chore: integrate and format episode request feature"
           git push origin HEAD:feature/episode-requests-v3.4.1
