@@ -7,9 +7,15 @@ import type {
   TmdbKeyword,
   TmdbTvDetails,
 } from '@server/api/themoviedb/interfaces';
-import { MediaStatus, MediaType } from '@server/constants/media';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import EpisodeRequest from '@server/entity/EpisodeRequest';
 import Media from '@server/entity/Media';
+import MediaRequest from '@server/entity/MediaRequest';
 import type {
   ProcessableSeason,
   RunnableScanner,
@@ -227,11 +233,88 @@ class SonarrScanner
         title: sonarrSeries.title,
         is4k: server4k,
       });
+
+      await this.syncEpisodeRequests(tmdbId, sonarrSeries, server4k);
     } catch (e) {
       this.log('Failed to process Sonarr media', 'error', {
         errorMessage: e.message,
         title: sonarrSeries.title,
       });
+    }
+  }
+
+  private async syncEpisodeRequests(
+    tmdbId: number,
+    sonarrSeries: SonarrSeries,
+    is4k: boolean
+  ): Promise<void> {
+    if (!sonarrSeries.id) {
+      return;
+    }
+
+    const requestRepository = getRepository(MediaRequest);
+    const episodeRequestRepository = getRepository(EpisodeRequest);
+    const requests = await requestRepository
+      .createQueryBuilder('request')
+      .leftJoinAndSelect('request.media', 'media')
+      .leftJoinAndSelect('request.episodes', 'episodes')
+      .leftJoinAndSelect('request.requestedBy', 'requestedBy')
+      .where('request.type = :type', { type: MediaType.TV })
+      .andWhere('request.status = :status', {
+        status: MediaRequestStatus.APPROVED,
+      })
+      .andWhere('request.is4k = :is4k', { is4k })
+      .andWhere('media.tmdbId = :tmdbId', { tmdbId })
+      .andWhere('episodes.id IS NOT NULL')
+      .getMany();
+
+    if (requests.length === 0) {
+      return;
+    }
+
+    const sonarrEpisodes = await this.sonarrApi.getEpisodes(sonarrSeries.id);
+
+    for (const request of requests) {
+      const changedEpisodes: EpisodeRequest[] = [];
+
+      for (const episodeRequest of request.episodes ?? []) {
+        const sonarrEpisode = sonarrEpisodes.find(
+          (episode) =>
+            episode.seasonNumber === episodeRequest.seasonNumber &&
+            episode.episodeNumber === episodeRequest.episodeNumber
+        );
+
+        if (!sonarrEpisode) {
+          continue;
+        }
+
+        const newStatus = sonarrEpisode.hasFile
+          ? MediaRequestStatus.COMPLETED
+          : MediaRequestStatus.APPROVED;
+
+        if (episodeRequest.status !== newStatus) {
+          episodeRequest.status = newStatus;
+          changedEpisodes.push(episodeRequest);
+        }
+      }
+
+      if (changedEpisodes.length > 0) {
+        await episodeRequestRepository.save(changedEpisodes);
+      }
+
+      if (
+        request.episodes.length > 0 &&
+        request.episodes.every(
+          (episode) => episode.status === MediaRequestStatus.COMPLETED
+        )
+      ) {
+        request.status = MediaRequestStatus.COMPLETED;
+        await requestRepository.save(request);
+        this.log(
+          `Episode request ${request.id} completed for ${sonarrSeries.title}.`,
+          'info'
+        );
+      }
     }
   }
 
