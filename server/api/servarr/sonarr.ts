@@ -3,6 +3,10 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AxiosResponse } from 'axios';
 import ServarrBase from './base';
+import {
+  selectSeededEpisodeRelease,
+  type SonarrReleaseResource,
+} from './sonarrReleaseSelector';
 
 export interface SonarrSeason {
   seasonNumber: number;
@@ -438,7 +442,7 @@ class SonarrAPI extends ServarrBase<{
         .filter((episode) => !episode.hasFile)
         .map((episode) => episode.id);
       if (options.searchNow && missingEpisodeIds.length > 0) {
-        await this.searchEpisodes(missingEpisodeIds);
+        await this.searchEpisodesWithSeedPreference(missingEpisodeIds);
       }
 
       logger.info('Sonarr accepted episode request', {
@@ -499,6 +503,74 @@ class SonarrAPI extends ServarrBase<{
           seriesId,
         }
       );
+    }
+  }
+
+  private async searchEpisodesWithSeedPreference(
+    episodeIds: number[]
+  ): Promise<void> {
+    if (episodeIds.length === 0) {
+      return;
+    }
+
+    for (const episodeId of episodeIds) {
+      try {
+        logger.info('Searching Sonarr releases for seed-aware episode grab.', {
+          label: 'Sonarr API',
+          episodeId,
+        });
+
+        const response = await this.axios.get<SonarrReleaseResource[]>(
+          '/release',
+          { params: { episodeId } }
+        );
+        const selection = selectSeededEpisodeRelease(response.data);
+
+        if (selection.action === 'grab') {
+          await this.axios.post('/release', selection.release);
+          logger.info('Grabbed highest-seeded preferred episode release.', {
+            label: 'Sonarr API',
+            episodeId,
+            title: selection.release.title,
+            indexer: selection.release.indexer,
+            seeders: selection.release.seeders,
+            qualityWeight: selection.release.qualityWeight,
+            customFormatScore: selection.release.customFormatScore,
+          });
+          continue;
+        }
+
+        if (selection.action === 'fallback') {
+          logger.info(
+            'Preferred episode release is not a torrent; using Sonarr search.',
+            {
+              label: 'Sonarr API',
+              episodeId,
+            }
+          );
+          await this.searchEpisodes([episodeId]);
+          continue;
+        }
+
+        logger.warn(
+          'No healthy seeded torrent in Sonarr preferred release group; leaving episode monitored for RSS.',
+          {
+            label: 'Sonarr API',
+            episodeId,
+            reason: selection.reason,
+          }
+        );
+      } catch (e) {
+        logger.warn(
+          'Seed-aware episode search failed; falling back to Sonarr episode search.',
+          {
+            label: 'Sonarr API',
+            episodeId,
+            errorMessage: e.message,
+          }
+        );
+        await this.searchEpisodes([episodeId]);
+      }
     }
   }
 
