@@ -25,7 +25,10 @@ export const getApprovedEpisodeSelections = async ({
   const unique = new Map<string, EpisodeRequestSelection>();
   for (const request of requests) {
     for (const episode of request.episodes ?? []) {
-      if (episode.status === MediaRequestStatus.APPROVED) {
+      if (
+        episode.status !== MediaRequestStatus.DECLINED &&
+        episode.status !== MediaRequestStatus.COMPLETED
+      ) {
         unique.set(`${episode.seasonNumber}:${episode.episodeNumber}`, {
           seasonNumber: episode.seasonNumber,
           episodeNumber: episode.episodeNumber,
