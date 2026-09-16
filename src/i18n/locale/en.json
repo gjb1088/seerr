@@ -523,6 +523,7 @@
   "components.RequestList.RequestItem.cancelRequest": "Cancel Request",
   "components.RequestList.RequestItem.deleterequest": "Delete Request",
   "components.RequestList.RequestItem.editrequest": "Edit Request",
+  "components.RequestList.RequestItem.episodes": "{episodeCount, plural, one {Episode} other {Episodes}}",
   "components.RequestList.RequestItem.failedmodify": "Something went wrong while modifying the request.",
   "components.RequestList.RequestItem.failedretry": "Something went wrong while retrying the request.",
   "components.RequestList.RequestItem.mediaerror": "{mediaType} Not Found",

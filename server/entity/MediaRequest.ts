@@ -448,7 +448,7 @@ export class MediaRequest {
           ).values()
         );
 
-        const activeRequests = (media.requests ?? []).filter(
+        const activeRequests = existing.filter(
           (request) =>
             request.is4k === requestBody.is4k &&
             request.status !== MediaRequestStatus.DECLINED &&

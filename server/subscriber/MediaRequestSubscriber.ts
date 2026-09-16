@@ -707,6 +707,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           title: series.name,
           tvdbid: tvdbId,
           seasons: entity.seasons.map((season) => season.seasonNumber),
+          episodes: entity.episodes?.map((episode) => ({
+            seasonNumber: episode.seasonNumber,
+            episodeNumber: episode.episodeNumber,
+          })),
           seasonFolder: sonarrSettings.enableSeasonFolders,
           seriesType,
           tags,

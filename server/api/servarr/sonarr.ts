@@ -115,6 +115,7 @@ export interface AddSeriesOptions {
   monitored?: boolean;
   monitorNewItems?: SonarrSeries['monitorNewItems'];
   searchNow?: boolean;
+  episodes?: EpisodeSelection[];
 }
 
 export interface LanguageProfile {
@@ -214,10 +215,12 @@ class SonarrAPI extends ServarrBase<{
 
   public async addSeries(options: AddSeriesOptions): Promise<SonarrSeries> {
     if (options.seasons.length === 0) {
-      const approvedEpisodes = await getApprovedEpisodeSelections({
-        tvdbId: options.tvdbid,
-        is4k: this.is4k,
-      });
+      const approvedEpisodes = options.episodes?.length
+        ? options.episodes
+        : await getApprovedEpisodeSelections({
+            tvdbId: options.tvdbid,
+            is4k: this.is4k,
+          });
 
       if (approvedEpisodes.length === 0) {
         throw new Error(
