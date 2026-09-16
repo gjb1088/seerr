@@ -23,19 +23,22 @@ import { useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
 
-const messages = defineMessages('components.RequestModal.TvEpisodeRequestModal', {
-  title: 'Request Episodes',
-  title4k: 'Request Episodes in 4K',
-  selectepisodes: 'Select Episode(s)',
-  requestepisodes:
-    'Request {episodeCount} {episodeCount, plural, one {Episode} other {Episodes}}',
-  requestepisodes4k:
-    'Request {episodeCount} {episodeCount, plural, one {Episode} other {Episodes}} in 4K',
-  requestSuccess:
-    '<strong>{title}</strong> episode request submitted successfully!',
-  requesterror: 'Something went wrong while submitting the episode request.',
-  requestadmin: 'This request will be approved automatically.',
-});
+const messages = defineMessages(
+  'components.RequestModal.TvEpisodeRequestModal',
+  {
+    title: 'Request Episodes',
+    title4k: 'Request Episodes in 4K',
+    selectepisodes: 'Select Episode(s)',
+    requestepisodes:
+      'Request {episodeCount} {episodeCount, plural, one {Episode} other {Episodes}}',
+    requestepisodes4k:
+      'Request {episodeCount} {episodeCount, plural, one {Episode} other {Episodes}} in 4K',
+    requestSuccess:
+      '<strong>{title}</strong> episode request submitted successfully!',
+    requesterror: 'Something went wrong while submitting the episode request.',
+    requestadmin: 'This request will be approved automatically.',
+  }
+);
 
 interface TvEpisodeRequestModalProps {
   tmdbId: number;
@@ -57,7 +60,9 @@ const TvEpisodeRequestModal = ({
   const intl = useIntl();
   const { user, hasPermission } = useUser();
   const { data, error } = useSWR<TvDetails>(`/api/v1/tv/${tmdbId}`);
-  const [selectedEpisodes, setSelectedEpisodes] = useState<SelectedEpisode[]>([]);
+  const [selectedEpisodes, setSelectedEpisodes] = useState<SelectedEpisode[]>(
+    []
+  );
   const [requestOverrides, setRequestOverrides] =
     useState<RequestOverrides | null>(null);
   const [searchModal, setSearchModal] = useState({ show: true });
@@ -101,9 +106,7 @@ const TvEpisodeRequestModal = ({
     );
 
     for (const season of data?.mediaInfo?.seasons ?? []) {
-      if (
-        season[is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE
-      ) {
+      if (season[is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE) {
         seasonNumbers.add(season.seasonNumber);
       }
     }
@@ -147,8 +150,7 @@ const TvEpisodeRequestModal = ({
         ignoreQuota: requestOverrides?.ignoreQuota,
         episodes: [...selectedEpisodes].sort(
           (a, b) =>
-            a.seasonNumber - b.seasonNumber ||
-            a.episodeNumber - b.episodeNumber
+            a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber
         ),
         ...overrideParams,
       });
@@ -189,7 +191,9 @@ const TvEpisodeRequestModal = ({
         setTvdbId={setTvdbId}
         closeModal={() => setSearchModal({ show: false })}
         onCancel={onCancel}
-        modalTitle={intl.formatMessage(is4k ? messages.title4k : messages.title)}
+        modalTitle={intl.formatMessage(
+          is4k ? messages.title4k : messages.title
+        )}
         modalSubTitle={data.name}
         tmdbId={tmdbId}
         backdrop={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data.backdropPath}`}

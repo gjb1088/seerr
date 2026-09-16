@@ -11,18 +11,21 @@ export type SelectedEpisode = {
   episodeNumber: number;
 };
 
-const messages = defineMessages('components.RequestModal.EpisodeRequestSelector', {
-  season: 'Season',
-  episode: 'Episode',
-  title: 'Title',
-  airdate: 'Air Date',
-  loading: 'Loading episodes…',
-  loaderror: 'Unable to load episodes for this season.',
-  noepisodes: 'No episodes are available for this season.',
-  requestedseason: 'Season already requested',
-  requestedepisode: 'Already requested',
-  selected: 'Selected',
-});
+const messages = defineMessages(
+  'components.RequestModal.EpisodeRequestSelector',
+  {
+    season: 'Season',
+    episode: 'Episode',
+    title: 'Title',
+    airdate: 'Air Date',
+    loading: 'Loading episodes…',
+    loaderror: 'Unable to load episodes for this season.',
+    noepisodes: 'No episodes are available for this season.',
+    requestedseason: 'Season already requested',
+    requestedepisode: 'Already requested',
+    selected: 'Selected',
+  }
+);
 
 interface EpisodeRequestSelectorProps {
   tmdbId: number;
@@ -188,19 +191,25 @@ const EpisodeRequestSelector = ({
                         disabled={disabled}
                         onClick={() => toggleEpisode(selection)}
                         className={`relative inline-flex h-5 w-10 items-center justify-center focus:outline-none ${
-                          disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                          disabled
+                            ? 'cursor-not-allowed opacity-50'
+                            : 'cursor-pointer'
                         }`}
                       >
                         <span
                           aria-hidden="true"
                           className={`absolute mx-auto h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${
-                            selected || disabled ? 'bg-indigo-500' : 'bg-gray-700'
+                            selected || disabled
+                              ? 'bg-indigo-500'
+                              : 'bg-gray-700'
                           }`}
                         />
                         <span
                           aria-hidden="true"
                           className={`absolute left-0 inline-block h-5 w-5 rounded-full border border-gray-200 bg-white shadow transition-transform duration-200 ease-in-out ${
-                            selected || disabled ? 'translate-x-5' : 'translate-x-0'
+                            selected || disabled
+                              ? 'translate-x-5'
+                              : 'translate-x-0'
                           }`}
                         />
                       </button>

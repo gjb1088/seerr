@@ -486,7 +486,9 @@ export class MediaRequest {
         );
 
         if (finalEpisodes.length === 0) {
-          throw new NoEpisodesAvailableError('No episodes available to request');
+          throw new NoEpisodesAvailableError(
+            'No episodes available to request'
+          );
         } else if (
           !ignoreQuota &&
           quotas.tv.limit &&

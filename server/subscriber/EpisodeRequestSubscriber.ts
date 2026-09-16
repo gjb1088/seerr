@@ -12,9 +12,7 @@ import type {
 import { EventSubscriber } from 'typeorm';
 
 @EventSubscriber()
-export class EpisodeRequestSubscriber
-  implements EntitySubscriberInterface<MediaRequest>
-{
+export class EpisodeRequestSubscriber implements EntitySubscriberInterface<MediaRequest> {
   public listenTo(): typeof MediaRequest {
     return MediaRequest;
   }
@@ -73,11 +71,14 @@ export class EpisodeRequestSubscriber
     try {
       await this.syncStatus(event.entity);
     } catch (e) {
-      logger.error('Failed to synchronize episode request status after insert', {
-        label: 'Episode Request',
-        requestId: event.entity.id,
-        errorMessage: e instanceof Error ? e.message : String(e),
-      });
+      logger.error(
+        'Failed to synchronize episode request status after insert',
+        {
+          label: 'Episode Request',
+          requestId: event.entity.id,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        }
+      );
     }
   }
 

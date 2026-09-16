@@ -42,7 +42,11 @@ const TvRequestModal = ({
   const intl = useIntl();
   const { data } = useSWR<TvDetails>(`/api/v1/tv/${tmdbId}`);
   const [mode, setMode] = useState<RequestMode>(
-    editRequest ? (editRequest.episodes?.length ? 'episodes' : 'seasons') : 'choose'
+    editRequest
+      ? editRequest.episodes?.length
+        ? 'episodes'
+        : 'seasons'
+      : 'choose'
   );
 
   if (editRequest?.episodes?.length) {

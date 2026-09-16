@@ -225,10 +225,7 @@ class SonarrAPI extends ServarrBase<{
         );
       }
 
-      const result = await this.addSeriesForEpisodes(
-        options,
-        approvedEpisodes
-      );
+      const result = await this.addSeriesForEpisodes(options, approvedEpisodes);
       return result.series;
     }
 
@@ -427,7 +424,9 @@ class SonarrAPI extends ServarrBase<{
           .map(
             (episode) => `S${episode.seasonNumber}E${episode.episodeNumber}`
           );
-        throw new Error(`Sonarr could not resolve episodes: ${missing.join(', ')}`);
+        throw new Error(
+          `Sonarr could not resolve episodes: ${missing.join(', ')}`
+        );
       }
 
       await this.monitorEpisodes(selectedEpisodes.map((episode) => episode.id));
@@ -513,11 +512,14 @@ class SonarrAPI extends ServarrBase<{
     try {
       await this.runCommand('EpisodeSearch', { episodeIds });
     } catch (e) {
-      logger.error('Something went wrong while executing Sonarr episode search.', {
-        label: 'Sonarr API',
-        errorMessage: e.message,
-        episodeIds,
-      });
+      logger.error(
+        'Something went wrong while executing Sonarr episode search.',
+        {
+          label: 'Sonarr API',
+          errorMessage: e.message,
+          episodeIds,
+        }
+      );
       throw e;
     }
   }
