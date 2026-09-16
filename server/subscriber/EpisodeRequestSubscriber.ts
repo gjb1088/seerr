@@ -1,7 +1,9 @@
 import { MediaRequestStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import EpisodeRequest from '@server/entity/EpisodeRequest';
+import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import { Notification } from '@server/lib/notifications';
 import logger from '@server/logger';
 import type {
   EntitySubscriberInterface,
@@ -47,6 +49,30 @@ export class EpisodeRequestSubscriber
     }
   }
 
+  private async notifyCompleted(entity: MediaRequest): Promise<void> {
+    if (
+      entity.type !== MediaType.TV ||
+      !entity.episodes?.length ||
+      entity.status !== MediaRequestStatus.COMPLETED
+    ) {
+      return;
+    }
+
+    const media =
+      entity.media ??
+      (await getRepository(Media).findOne({
+        where: { id: entity.media?.id },
+      }));
+
+    if (media) {
+      await MediaRequest.sendNotification(
+        entity,
+        media,
+        Notification.MEDIA_AVAILABLE
+      );
+    }
+  }
+
   public async afterInsert(event: InsertEvent<MediaRequest>): Promise<void> {
     if (!event.entity) {
       return;
@@ -70,8 +96,9 @@ export class EpisodeRequestSubscriber
 
     try {
       await this.syncStatus(event.entity);
+      await this.notifyCompleted(event.entity);
     } catch (e) {
-      logger.error('Failed to synchronize episode request status after update', {
+      logger.error('Failed to synchronize episode request after update', {
         label: 'Episode Request',
         requestId: event.entity.id,
         errorMessage: e instanceof Error ? e.message : String(e),
