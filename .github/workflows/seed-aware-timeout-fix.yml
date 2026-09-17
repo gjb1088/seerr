@@ -1,0 +1,68 @@
+name: Seed-aware Timeout Fix
+
+on:
+  push:
+    branches:
+      - feature/seed-aware-search-timeout
+    paths:
+      - '.github/workflows/seed-aware-timeout-fix.yml'
+      - 'scripts/seed-aware-timeout-codemod.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: CYPRESS_INSTALL_BINARY=0 pnpm install --frozen-lockfile
+
+      - name: Apply timeout fix
+        run: node scripts/seed-aware-timeout-codemod.mjs
+
+      - name: Format changed file
+        run: pnpm exec prettier --write server/api/servarr/sonarr.ts
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Check i18n
+        run: node bin/check-i18n.js
+
+      - name: Commit generated runtime fix
+        shell: bash
+        run: |
+          if git diff --quiet -- server/api/servarr/sonarr.ts; then
+            echo 'No generated changes to commit.'
+            exit 0
+          fi
+          git config user.name 'gjb1088'
+          git config user.email '39758034+gjb1088@users.noreply.github.com'
+          git add server/api/servarr/sonarr.ts
+          git commit -m 'fix: extend seed-aware Sonarr search timeout'
+          git push
