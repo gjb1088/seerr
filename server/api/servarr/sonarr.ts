@@ -520,10 +520,26 @@ class SonarrAPI extends ServarrBase<{
           episodeId,
         });
 
+        const searchStartedAt = Date.now();
+        const seedAwareSearchTimeoutMs = 90_000;
         const response = await this.axios.get<SonarrReleaseResource[]>(
           '/release',
-          { params: { episodeId } }
+          {
+            params: { episodeId },
+            timeout: seedAwareSearchTimeoutMs,
+          }
         );
+
+        logger.info(
+          'Received Sonarr release candidates for seed-aware episode grab.',
+          {
+            label: 'Sonarr API',
+            episodeId,
+            releaseCount: response.data.length,
+            elapsedMs: Date.now() - searchStartedAt,
+          }
+        );
+
         const selection = selectSeededEpisodeRelease(response.data);
 
         if (selection.action === 'grab') {
@@ -561,6 +577,25 @@ class SonarrAPI extends ServarrBase<{
           }
         );
       } catch (e) {
+        const timedOut =
+          e?.code === 'ECONNABORTED' ||
+          String(e?.message ?? '')
+            .toLowerCase()
+            .includes('timeout');
+
+        if (timedOut) {
+          logger.warn(
+            'Seed-aware episode search timed out; leaving episode monitored for RSS to avoid launching a duplicate Sonarr search.',
+            {
+              label: 'Sonarr API',
+              episodeId,
+              timeoutMs: 90_000,
+              errorMessage: e.message,
+            }
+          );
+          continue;
+        }
+
         logger.warn(
           'Seed-aware episode search failed; falling back to Sonarr episode search.',
           {
