@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  getEpisodeKey,
-  isEpisodeAired,
-} from '@server/lib/episodeAvailability';
+import { getEpisodeKey, isEpisodeAired } from '@server/lib/episodeAvailability';
 
 describe('episodeAvailability', () => {
   it('builds stable season and episode keys', () => {

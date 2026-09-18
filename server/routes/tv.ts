@@ -5,13 +5,13 @@ import { ANIME_KEYWORD_ID } from '@server/api/themoviedb/constants';
 import type { TmdbKeyword } from '@server/api/themoviedb/interfaces';
 import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import Media from '@server/entity/Media';
+import { Watchlist } from '@server/entity/Watchlist';
 import {
   getEpisodeKey,
   getSonarrEpisodeFileKeys,
   isEpisodeAired,
 } from '@server/lib/episodeAvailability';
-import Media from '@server/entity/Media';
-import { Watchlist } from '@server/entity/Watchlist';
 import logger from '@server/logger';
 import { mapTvResult } from '@server/models/Search';
 import { mapSeasonWithEpisodes, mapTvDetails } from '@server/models/Tv';

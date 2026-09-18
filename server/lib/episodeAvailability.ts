@@ -26,11 +26,14 @@ export const getTodayIsoDate = (): string => {
       return `${year}-${month}-${day}`;
     }
   } catch (e) {
-    logger.warn('Failed to resolve configured timezone for episode air dates.', {
-      label: 'Episode Availability',
-      timeZone,
-      errorMessage: e.message,
-    });
+    logger.warn(
+      'Failed to resolve configured timezone for episode air dates.',
+      {
+        label: 'Episode Availability',
+        timeZone,
+        errorMessage: e.message,
+      }
+    );
   }
 
   return new Date().toISOString().slice(0, 10);
@@ -84,7 +87,9 @@ export const getSonarrEpisodeFileKeys = async ({
     return new Set(
       response.data
         .filter((episode) => episode.hasFile)
-        .map((episode) => episodeKey(episode.seasonNumber, episode.episodeNumber))
+        .map((episode) =>
+          episodeKey(episode.seasonNumber, episode.episodeNumber)
+        )
     );
   } catch (e) {
     logger.warn('Unable to retrieve Sonarr episode availability.', {

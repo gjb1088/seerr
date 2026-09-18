@@ -205,17 +205,13 @@ const EpisodeRequestSelector = ({
                         <span
                           aria-hidden="true"
                           className={`absolute mx-auto h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${
-                            checked
-                              ? 'bg-indigo-500'
-                              : 'bg-gray-700'
+                            checked ? 'bg-indigo-500' : 'bg-gray-700'
                           }`}
                         />
                         <span
                           aria-hidden="true"
                           className={`absolute left-0 inline-block h-5 w-5 rounded-full border border-gray-200 bg-white shadow transition-transform duration-200 ease-in-out ${
-                            checked
-                              ? 'translate-x-5'
-                              : 'translate-x-0'
+                            checked ? 'translate-x-5' : 'translate-x-0'
                           }`}
                         />
                       </button>
