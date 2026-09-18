@@ -220,7 +220,7 @@ export class MediaRequest {
         logger.warn('Duplicate request for media blocked', {
           tmdbId: tmdbMedia.id,
           mediaType: requestBody.mediaType,
-          is4k: requestBody.is4k,
+          is4k: requestBody.is4k ?? false,
           label: 'Media Request',
         });
 
