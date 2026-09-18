@@ -298,10 +298,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     const availableSeasons = (data?.mediaInfo?.seasons ?? [])
       .filter(
         (season) =>
-          (season[is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE ||
-            season[is4k ? 'status4k' : 'status'] ===
-              MediaStatus.PARTIALLY_AVAILABLE ||
-            season[is4k ? 'status4k' : 'status'] === MediaStatus.PROCESSING) &&
+          season[is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE &&
           !requestedSeasons.includes(season.seasonNumber)
       )
       .map((season) => season.seasonNumber);
