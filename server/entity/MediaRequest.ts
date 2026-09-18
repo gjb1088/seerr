@@ -484,7 +484,7 @@ export class MediaRequest {
 
         const availableEpisodeKeys = await getSonarrEpisodeFileKeys({
           media,
-          is4k: requestBody.is4k,
+          is4k: requestBody.is4k ?? false,
         });
 
         const activeRequests = existing.filter(
