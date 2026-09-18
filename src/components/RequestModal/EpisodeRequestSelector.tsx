@@ -23,6 +23,7 @@ const messages = defineMessages(
     noepisodes: 'No episodes are available for this season.',
     requestedseason: 'Season already requested',
     requestedepisode: 'Already requested',
+    unaired: 'Not Yet Aired',
     selected: 'Selected',
   }
 );
@@ -31,6 +32,7 @@ interface EpisodeRequestSelectorProps {
   tmdbId: number;
   seasons: TvDetails['seasons'];
   enableSpecialEpisodes: boolean;
+  is4k: boolean;
   selectedEpisodes: SelectedEpisode[];
   onChange: (episodes: SelectedEpisode[]) => void;
   requestedEpisodeKeys?: Set<string>;
@@ -41,6 +43,7 @@ const EpisodeRequestSelector = ({
   tmdbId,
   seasons,
   enableSpecialEpisodes,
+  is4k,
   selectedEpisodes,
   onChange,
   requestedEpisodeKeys = new Set<string>(),
@@ -72,7 +75,7 @@ const EpisodeRequestSelector = ({
   const { data, error } = useSWR<SeasonWithEpisodes>(
     seasonNumber === undefined
       ? null
-      : `/api/v1/tv/${tmdbId}/season/${seasonNumber}`
+      : `/api/v1/tv/${tmdbId}/season/${seasonNumber}?is4k=${is4k}`
   );
 
   const isSelected = (episode: SelectedEpisode) =>
@@ -179,7 +182,10 @@ const EpisodeRequestSelector = ({
                 );
                 const episodeRequested = requestedEpisodeKeys.has(key);
                 const selected = isSelected(selection);
-                const disabled = seasonRequested || episodeRequested;
+                const available = episode.available === true;
+                const aired = episode.aired === true;
+                const checked = selected || seasonRequested || episodeRequested;
+                const disabled = checked || available || !aired;
 
                 return (
                   <tr key={episode.id}>
@@ -187,7 +193,7 @@ const EpisodeRequestSelector = ({
                       <button
                         type="button"
                         role="checkbox"
-                        aria-checked={selected || disabled}
+                        aria-checked={checked}
                         disabled={disabled}
                         onClick={() => toggleEpisode(selection)}
                         className={`relative inline-flex h-5 w-10 items-center justify-center focus:outline-none ${
@@ -199,17 +205,13 @@ const EpisodeRequestSelector = ({
                         <span
                           aria-hidden="true"
                           className={`absolute mx-auto h-4 w-9 rounded-full transition-colors duration-200 ease-in-out ${
-                            selected || disabled
-                              ? 'bg-indigo-500'
-                              : 'bg-gray-700'
+                            checked ? 'bg-indigo-500' : 'bg-gray-700'
                           }`}
                         />
                         <span
                           aria-hidden="true"
                           className={`absolute left-0 inline-block h-5 w-5 rounded-full border border-gray-200 bg-white shadow transition-transform duration-200 ease-in-out ${
-                            selected || disabled
-                              ? 'translate-x-5'
-                              : 'translate-x-0'
+                            checked ? 'translate-x-5' : 'translate-x-0'
                           }`}
                         />
                       </button>
@@ -224,7 +226,11 @@ const EpisodeRequestSelector = ({
                       {episode.airDate ?? '—'}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-200">
-                      {seasonRequested ? (
+                      {available ? (
+                        <Badge badgeType="success">
+                          {intl.formatMessage(globalMessages.available)}
+                        </Badge>
+                      ) : seasonRequested ? (
                         <Badge badgeType="warning">
                           {intl.formatMessage(messages.requestedseason)}
                         </Badge>
@@ -232,6 +238,8 @@ const EpisodeRequestSelector = ({
                         <Badge badgeType="warning">
                           {intl.formatMessage(messages.requestedepisode)}
                         </Badge>
+                      ) : !aired ? (
+                        <Badge>{intl.formatMessage(messages.unaired)}</Badge>
                       ) : selected ? (
                         <Badge badgeType="primary">
                           {intl.formatMessage(messages.selected)}

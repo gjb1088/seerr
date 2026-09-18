@@ -7,6 +7,11 @@ import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { Watchlist } from '@server/entity/Watchlist';
+import {
+  getEpisodeKey,
+  getSonarrEpisodeFileKeys,
+  isEpisodeAired,
+} from '@server/lib/episodeAvailability';
 import logger from '@server/logger';
 import { mapTvResult } from '@server/models/Search';
 import { mapSeasonWithEpisodes, mapTvDetails } from '@server/models/Tv';
@@ -84,7 +89,23 @@ tvRoutes.get('/:id/season/:seasonNumber', async (req, res, next) => {
       language: (req.query.language as string) ?? req.locale,
     });
 
-    return res.status(200).json(mapSeasonWithEpisodes(season));
+    const mappedSeason = mapSeasonWithEpisodes(season);
+    const media = await Media.getMedia(Number(req.params.id), MediaType.TV);
+    const is4k = req.query.is4k === 'true';
+    const availableEpisodeKeys = await getSonarrEpisodeFileKeys({
+      media,
+      is4k,
+    });
+
+    mappedSeason.episodes = mappedSeason.episodes.map((episode) => ({
+      ...episode,
+      aired: isEpisodeAired(episode.airDate),
+      available: availableEpisodeKeys.has(
+        getEpisodeKey(episode.seasonNumber, episode.episodeNumber)
+      ),
+    }));
+
+    return res.status(200).json(mappedSeason);
   } catch (e) {
     logger.debug('Something went wrong retrieving season', {
       label: 'API',

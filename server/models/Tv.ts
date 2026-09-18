@@ -38,6 +38,8 @@ interface Episode {
   stillPath?: string;
   voteAverage: number;
   voteCount: number;
+  aired?: boolean;
+  available?: boolean;
 }
 
 interface Season {

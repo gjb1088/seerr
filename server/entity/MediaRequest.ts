@@ -1,3 +1,4 @@
+import { getMetadataProvider } from '@server/api/metadata';
 import TheMovieDb from '@server/api/themoviedb';
 import { ANIME_KEYWORD_ID } from '@server/api/themoviedb/constants';
 import type { TmdbKeyword } from '@server/api/themoviedb/interfaces';
@@ -9,10 +10,16 @@ import {
 import { getRepository } from '@server/datasource';
 import OverrideRule from '@server/entity/OverrideRule';
 import type { MediaRequestBody } from '@server/interfaces/api/requestInterfaces';
+import {
+  getEpisodeKey,
+  getSonarrEpisodeFileKeys,
+  isEpisodeAired,
+} from '@server/lib/episodeAvailability';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { mapSeasonWithEpisodes } from '@server/models/Tv';
 import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
 import { truncate } from 'lodash';
 import {
@@ -213,7 +220,7 @@ export class MediaRequest {
         logger.warn('Duplicate request for media blocked', {
           tmdbId: tmdbMedia.id,
           mediaType: requestBody.mediaType,
-          is4k: requestBody.is4k,
+          is4k: requestBody.is4k ?? false,
           label: 'Media Request',
         });
 
@@ -448,6 +455,38 @@ export class MediaRequest {
           ).values()
         );
 
+        const tmdbMediaShow = tmdbMedia as Awaited<
+          ReturnType<typeof tmdb.getTvShow>
+        >;
+        const tvMetadataProvider = tmdbMediaShow.keywords.results.some(
+          (keyword: TmdbKeyword) => keyword.id === ANIME_KEYWORD_ID
+        )
+          ? await getMetadataProvider('anime')
+          : await getMetadataProvider('tv');
+        const airedEpisodeKeys = new Set<string>();
+
+        for (const seasonNumber of [
+          ...new Set(requestedEpisodes.map((episode) => episode.seasonNumber)),
+        ]) {
+          const season = await tvMetadataProvider.getTvSeason({
+            tvId: requestBody.mediaId,
+            seasonNumber,
+          });
+
+          for (const episode of mapSeasonWithEpisodes(season).episodes) {
+            if (isEpisodeAired(episode.airDate)) {
+              airedEpisodeKeys.add(
+                getEpisodeKey(episode.seasonNumber, episode.episodeNumber)
+              );
+            }
+          }
+        }
+
+        const availableEpisodeKeys = await getSonarrEpisodeFileKeys({
+          media,
+          is4k: requestBody.is4k ?? false,
+        });
+
         const activeRequests = existing.filter(
           (request) =>
             request.is4k === requestBody.is4k &&
@@ -476,14 +515,20 @@ export class MediaRequest {
             .map((season) => season.seasonNumber)
         );
 
-        const finalEpisodes = requestedEpisodes.filter(
-          (episode) =>
+        const finalEpisodes = requestedEpisodes.filter((episode) => {
+          const key = getEpisodeKey(
+            episode.seasonNumber,
+            episode.episodeNumber
+          );
+
+          return (
+            airedEpisodeKeys.has(key) &&
+            !availableEpisodeKeys.has(key) &&
             !requestedWholeSeasons.has(episode.seasonNumber) &&
-            !existingEpisodeKeys.has(
-              `${episode.seasonNumber}:${episode.episodeNumber}`
-            ) &&
+            !existingEpisodeKeys.has(key) &&
             !availableSeasons.has(episode.seasonNumber)
-        );
+          );
+        });
 
         if (finalEpisodes.length === 0) {
           throw new NoEpisodesAvailableError(
