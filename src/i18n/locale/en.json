@@ -568,6 +568,7 @@
   "components.RequestModal.EpisodeRequestSelector.season": "Season",
   "components.RequestModal.EpisodeRequestSelector.selected": "Selected",
   "components.RequestModal.EpisodeRequestSelector.title": "Title",
+  "components.RequestModal.EpisodeRequestSelector.unaired": "Not Yet Aired",
   "components.RequestModal.QuotaDisplay.allowedRequests": "You are allowed to request <strong>{limit}</strong> {type}{days, plural, =0 {} one { every day} other { every <strong>{days}</strong> days}}.",
   "components.RequestModal.QuotaDisplay.allowedRequestsUser": "This user is allowed to request <strong>{limit}</strong> {type}{days, plural, =0 {} one { every day} other { every <strong>{days}</strong> days}}.",
   "components.RequestModal.QuotaDisplay.movie": "movie",
