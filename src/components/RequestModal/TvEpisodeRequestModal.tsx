@@ -269,6 +269,7 @@ const TvEpisodeRequestModal = ({
           tmdbId={tmdbId}
           seasons={data.seasons}
           enableSpecialEpisodes={settings.currentSettings.enableSpecialEpisodes}
+          is4k={is4k}
           selectedEpisodes={selectedEpisodes}
           onChange={setSelectedEpisodes}
           requestedEpisodeKeys={requestedEpisodeKeys}
