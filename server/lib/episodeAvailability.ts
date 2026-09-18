@@ -1,7 +1,8 @@
-import SonarrAPI from '@server/api/servarr/sonarr';
+import ServarrBase from '@server/api/servarr/base';
 import type Media from '@server/entity/Media';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import axios from 'axios';
 
 const episodeKey = (seasonNumber: number, episodeNumber: number) =>
   `${seasonNumber}:${episodeNumber}`;
@@ -66,14 +67,22 @@ export const getSonarrEpisodeFileKeys = async ({
   }
 
   try {
-    const sonarr = new SonarrAPI({
-      apiKey: server.apiKey,
-      url: SonarrAPI.buildUrl(server, '/api/v3'),
+    const response = await axios.get<
+      {
+        seasonNumber: number;
+        episodeNumber: number;
+        hasFile: boolean;
+      }[]
+    >(`${ServarrBase.buildUrl(server, '/api/v3')}/episode`, {
+      params: {
+        apikey: server.apiKey,
+        seriesId: externalServiceId,
+      },
+      timeout: getSettings().network.apiRequestTimeout,
     });
-    const episodes = await sonarr.getEpisodes(externalServiceId);
 
     return new Set(
-      episodes
+      response.data
         .filter((episode) => episode.hasFile)
         .map((episode) => episodeKey(episode.seasonNumber, episode.episodeNumber))
     );
