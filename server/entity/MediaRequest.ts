@@ -455,7 +455,10 @@ export class MediaRequest {
           ).values()
         );
 
-        const tvMetadataProvider = tmdbMedia.keywords.results.some(
+        const tmdbMediaShow = tmdbMedia as Awaited<
+          ReturnType<typeof tmdb.getTvShow>
+        >;
+        const tvMetadataProvider = tmdbMediaShow.keywords.results.some(
           (keyword: TmdbKeyword) => keyword.id === ANIME_KEYWORD_ID
         )
           ? await getMetadataProvider('anime')
