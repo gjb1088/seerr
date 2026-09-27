@@ -17,8 +17,10 @@ import type {
   UserResultsResponse,
   UserWatchDataResponse,
 } from '@server/interfaces/api/userInterfaces';
+import type { WrappedResponse } from '@server/interfaces/api/wrappedInterfaces';
 import { Permission, hasPermission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
+import { generateWrapped } from '@server/lib/wrapped';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { getHostname } from '@server/utils/getHostname';
@@ -497,6 +499,56 @@ router.get<{ id: string }, UserRequestsResponse>(
       });
     } catch (e) {
       next({ status: 500, message: e.message });
+    }
+  }
+);
+
+router.get<{ id: string }, WrappedResponse>(
+  '/:id/wrapped',
+  async (req, res, next) => {
+    const currentYear = new Date().getFullYear();
+    const year = req.query.year ? Number(req.query.year) : currentYear;
+
+    if (!Number.isInteger(year) || year < 2000 || year > currentYear) {
+      return next({ status: 400, message: 'Invalid year.' });
+    }
+
+    try {
+      const user = await getRepository(User).findOne({
+        where: { id: Number(req.params.id) },
+      });
+
+      if (!user) {
+        return next({ status: 404, message: 'User not found.' });
+      }
+
+      if (
+        user.id !== req.user?.id &&
+        !req.user?.hasPermission(
+          [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
+          { type: 'or' }
+        )
+      ) {
+        return next({
+          status: 403,
+          message: "You do not have permission to view this user's Wrapped.",
+        });
+      }
+
+      const wrapped = await generateWrapped(
+        user,
+        year,
+        (req.query.language as string) ?? req.locale
+      );
+
+      return res.status(200).json(wrapped);
+    } catch (e) {
+      logger.error('Something went wrong generating Wrapped', {
+        label: 'API',
+        errorMessage: e.message,
+        userId: req.params.id,
+      });
+      next({ status: 500, message: 'Unable to generate Wrapped.' });
     }
   }
 );

@@ -5090,6 +5090,72 @@ paths:
       responses:
         '204':
           description: Succesfully removed watchlist item
+  /user/{userId}/wrapped:
+    get:
+      summary: Get a user's year in review
+      description: |
+        Returns a "Wrapped" style summary of the requests a user made during a given year: totals, top genres, people, standout titles and how they rank against other users on the server. Requires `MANAGE_REQUESTS` or `REQUEST_VIEW` permission if viewing other users.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: year
+          required: false
+          schema:
+            type: number
+            example: 2026
+        - in: query
+          name: language
+          required: false
+          schema:
+            type: string
+            example: en
+      responses:
+        '200':
+          description: Year in review for the user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  year:
+                    type: number
+                    example: 2026
+                  availableYears:
+                    type: array
+                    items:
+                      type: number
+                  totals:
+                    type: object
+                  runtimeMinutes:
+                    type: number
+                  timestamps:
+                    type: array
+                    items:
+                      type: string
+                  topGenres:
+                    type: array
+                    items:
+                      type: object
+                  topActors:
+                    type: array
+                    items:
+                      type: object
+                  posters:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Invalid year
+        '403':
+          description: Not allowed to view this user's Wrapped
+        '404':
+          description: User not found
   /user/{userId}/watchlist:
     get:
       summary: Get the Plex watchlist for a specific user
