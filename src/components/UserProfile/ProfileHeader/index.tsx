@@ -3,7 +3,7 @@ import CachedImage from '@app/components/Common/CachedImage';
 import type { User } from '@app/hooks/useUser';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
-import { CogIcon, UserIcon } from '@heroicons/react/24/solid';
+import { CogIcon, SparklesIcon, UserIcon } from '@heroicons/react/24/solid';
 import Link from 'next/link';
 import { useIntl } from 'react-intl';
 
@@ -12,6 +12,7 @@ const messages = defineMessages('components.UserProfile.ProfileHeader', {
   profile: 'View Profile',
   joindate: 'Joined {joindate}',
   userid: 'User ID: {userid}',
+  wrapped: '{year} Wrapped',
 });
 
 interface ProfileHeaderProps {
@@ -32,6 +33,16 @@ const ProfileHeader = ({ user, isSettingsPage }: ProfileHeaderProps) => {
       }),
     }),
   ];
+
+  // In January the year that just ended is the more interesting one
+  const now = new Date();
+  const wrappedYear =
+    now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const canViewWrapped =
+    loggedInUser?.id === user.id ||
+    hasPermission([Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW], {
+      type: 'or',
+    });
 
   if (hasPermission(Permission.MANAGE_REQUESTS)) {
     subtextItems.push(intl.formatMessage(messages.userid, { userid: user.id }));
@@ -81,7 +92,22 @@ const ProfileHeader = ({ user, isSettingsPage }: ProfileHeaderProps) => {
           </p>
         </div>
       </div>
-      <div className="mt-6 flex flex-col-reverse justify-stretch space-y-4 space-y-reverse lg:flex-row lg:justify-end lg:space-x-3 lg:space-y-0 lg:space-x-reverse">
+      <div className="mt-6 flex flex-col-reverse justify-stretch space-y-4 space-y-reverse lg:flex-row lg:justify-end lg:gap-3 lg:space-y-0">
+        {canViewWrapped && !isSettingsPage && (
+          <Link
+            href={`${
+              loggedInUser?.id === user.id
+                ? '/profile/wrapped'
+                : `/users/${user.id}/wrapped`
+            }?year=${wrappedYear}`}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-400 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-fuchsia-500/20 ring-1 ring-white/20 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-fuchsia-300"
+          >
+            <SparklesIcon className="h-5 w-5" />
+            <span>
+              {intl.formatMessage(messages.wrapped, { year: wrappedYear })}
+            </span>
+          </Link>
+        )}
         {(loggedInUser?.id === user.id ||
           (user.id !== 1 && hasPermission(Permission.MANAGE_USERS))) &&
         !isSettingsPage ? (
