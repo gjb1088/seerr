@@ -85,6 +85,46 @@ const EpisodeRequestSelector = ({
         selected.episodeNumber === episode.episodeNumber
     );
 
+  useEffect(() => {
+    if (!data) {
+      return;
+    }
+
+    const invalidEpisodeKeys = new Set(
+      data.episodes
+        .filter((episode) => {
+          const key = `${episode.seasonNumber}:${episode.episodeNumber}`;
+
+          return (
+            episode.available === true ||
+            episode.aired !== true ||
+            requestedSeasonNumbers.has(episode.seasonNumber) ||
+            requestedEpisodeKeys.has(key)
+          );
+        })
+        .map(
+          (episode) => `${episode.seasonNumber}:${episode.episodeNumber}`
+        )
+    );
+
+    const nextSelectedEpisodes = selectedEpisodes.filter(
+      (episode) =>
+        !invalidEpisodeKeys.has(
+          `${episode.seasonNumber}:${episode.episodeNumber}`
+        )
+    );
+
+    if (nextSelectedEpisodes.length !== selectedEpisodes.length) {
+      onChange(nextSelectedEpisodes);
+    }
+  }, [
+    data,
+    onChange,
+    requestedEpisodeKeys,
+    requestedSeasonNumbers,
+    selectedEpisodes,
+  ]);
+
   const toggleEpisode = (episode: SelectedEpisode) => {
     const key = `${episode.seasonNumber}:${episode.episodeNumber}`;
     if (
@@ -184,8 +224,9 @@ const EpisodeRequestSelector = ({
                 const selected = isSelected(selection);
                 const available = episode.available === true;
                 const aired = episode.aired === true;
-                const checked = selected || seasonRequested || episodeRequested;
-                const disabled = checked || available || !aired;
+                const checked =
+                  selected || seasonRequested || episodeRequested || available;
+                const disabled = checked || !aired;
 
                 return (
                   <tr key={episode.id}>
