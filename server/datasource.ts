@@ -1,5 +1,6 @@
 import { Blocklist } from '@server/entity/Blocklist';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
+import EpisodeRequest from '@server/entity/EpisodeRequest';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
 import Media from '@server/entity/Media';
@@ -14,6 +15,7 @@ import { UserSettings } from '@server/entity/UserSettings';
 import { Watchlist } from '@server/entity/Watchlist';
 import { IssueCommentSubscriber } from '@server/subscriber/IssueCommentSubscriber';
 import { IssueSubscriber } from '@server/subscriber/IssueSubscriber';
+import { EpisodeRequestSubscriber } from '@server/subscriber/EpisodeRequestSubscriber';
 import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
 import { MediaSubscriber } from '@server/subscriber/MediaSubscriber';
 import { isPgsql } from '@server/utils/dbType';
@@ -27,6 +29,7 @@ const DB_SSL_PREFIX = 'DB_SSL_';
 const entities = [
   Blocklist,
   DiscoverSlider,
+  EpisodeRequest,
   Issue,
   IssueComment,
   Media,
@@ -44,6 +47,7 @@ const entities = [
 const subscribers = [
   IssueCommentSubscriber,
   IssueSubscriber,
+  EpisodeRequestSubscriber,
   MediaRequestSubscriber,
   MediaSubscriber,
 ];
