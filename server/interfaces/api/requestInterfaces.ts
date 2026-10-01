@@ -13,11 +13,17 @@ export interface RequestResultsResponse extends PaginatedResponse {
   };
 }
 
+export type EpisodeRequestSelection = {
+  seasonNumber: number;
+  episodeNumber: number;
+};
+
 export type MediaRequestBody = {
   mediaType: MediaType;
   mediaId: number;
   tvdbId?: number;
   seasons?: number[] | 'all';
+  episodes?: EpisodeRequestSelection[];
   is4k?: boolean;
   serverId?: number;
   profileId?: number;
