@@ -5582,6 +5582,11 @@ paths:
           schema:
             type: string
             example: en
+        - in: query
+          name: is4k
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: Results
